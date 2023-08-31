@@ -1,0 +1,59 @@
+name: cron-mirror
+
+on:
+  workflow_dispatch:
+#   schedule:
+#     - cron: '0 0 * * 0' # 每周日
+
+jobs:
+  mirror:
+    name: Mirror on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Checkout-mirror
+        uses: actions/checkout@v3
+        with:
+          repository: alexv587/charging-oss
+          ref: gh-pages
+          path: gh-pages-mirror
+      - name: Merge Github Pages
+        run: |
+          mkdir -p gh-pages
+          if [ -d gh-pages-mirror ]; then cp -r gh-pages-mirror/. gh-pages/; fi
+      - name: Check Github Pages
+        uses: actions/github-script@v6
+        with:
+          script: |
+            var shouldCheck = false;
+            try {
+              var branch = await github.rest.repos.getBranch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: "gh-pages",
+              });
+              shouldCheck = branch.status === 200;
+            } catch (error) {
+              if (error.status === 404) {
+                shouldCheck = false;
+              } else {
+                throw error;
+              }
+            }
+            if (shouldCheck) {
+              await github.rest.repos.getPages({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+            }
+      - name: Deploy Github Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: gh-pages
+          branch: gh-pages
